@@ -1,0 +1,25 @@
+{
+  "name": "le-foody",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Dakantz/le-foody.git"
+  },
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Dakantz/le-foody/issues"
+  },
+  "homepage": "https://github.com/Dakantz/le-foody#readme",
+  "dependencies": {
+    "@googlemaps/google-maps-services-js": "^3.3.9",
+    "axios": "^0.25.0",
+    "mongodb": "^4.3.1",
+    "node-fetch": "^3.2.0",
+    "querystring": "^0.2.1"
+  }
+}
