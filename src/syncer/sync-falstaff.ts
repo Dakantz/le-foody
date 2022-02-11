@@ -46,7 +46,8 @@ async function getRestaurants(region?: string, state?: string, page: number = 0)
 }
 let regions_str = "Österreich,Deutschland,Italien,Schweiz,Frankreich,Spanien,USA,Großbritannien,Belgien,Kroatien,Niederlande,China,Ungarn,Slowenien,Japan,Dänemark,Tschechische Republik,Portugal,Schweden,Polen,Israel,Türkei,Brasilien,Russische Föderation,Irland,Australien,Südafrika,Norwegen,Südkorea,Griechenland,Finnland,Luxemburg,Marokko,Thailand,Ukraine,Lettland,Taiwan,Äquatorialguinea,Singapur,Vietnam,Kanada,Vereinigten Arabischen Emirate,Estland,Neuseeland,Bulgarien,Slowakei,Rumänien,Kuba,Island,Litauen,Peru,Argentinien,Liechtenstein,Uruguay,Indien,Laos,Mexiko,Barbados,Indonesien,Malaysia,Malta,Bosnien und Herzegowina,Jamaika,Monaco,Libanon,Macao,Antigua und Barbuda,Botsuana,Chile,Malediven,Montenegro,San Marino,Seychellen"
 let gclient = new Client();
-let skip_states = [];
+let skip_states = [];//["Wien"];
+let skip_regions = [];//["Österreich", "Deutschland"];
 (async () => {
     await client.connect();
     let db = client.db("le-foody-db")
@@ -62,6 +63,11 @@ let skip_states = [];
     })
     let regions = regions_str.split(",")//Object.keys(facet_probe.facets["region.country"])
     for (let region of regions) {
+        if (skip_regions.includes(region)) {
+            console.log("Skipping region", region)
+            continue;
+        }
+        console.log(`Starting with region ${region}`)
         let facet_probe = await getRestaurants(region);
         let states = Object.keys(facet_probe.facets["region.state"])
 
@@ -79,15 +85,21 @@ let skip_states = [];
                 let restaurants = []
                 for (let restaurant of data.hits) {
 
-                    let place = await gclient.findPlaceFromText({
-                        params: {
-                            key: places_key,
-                            input: restaurant.name,
-                            inputtype: PlaceInputType.textQuery,
-                            fields: ["name", "geometry", "price_level", "rating", "user_ratings_total"]
-                        }
-                    })
-                    let candidate = place.data.candidates.length > 0 ? place.data.candidates[0] : null
+                    let place;
+                    try {
+                        place = await gclient.findPlaceFromText({
+                            params: {
+                                key: places_key,
+                                input: restaurant.name,
+                                inputtype: PlaceInputType.textQuery,
+                                fields: ["name", "geometry", "price_level", "rating", "user_ratings_total"]
+                            }
+                        })
+                    } catch {
+                        console.warn("Failed to reverse-search for ", restaurant.name)
+                    }
+
+                    let candidate = place && place.data.candidates.length > 0 ? place.data.candidates[0] : null
 
                     let coords = restaurant._geoloc ? [parseFloat(restaurant._geoloc.lng), parseFloat(restaurant._geoloc.lat),] : [0, 0]
 
