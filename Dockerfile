@@ -2,6 +2,8 @@ FROM node:17
 
 ENV PORT 80
 
+RUN npm install -g typescript
+RUN npm install -g ts-node
 # Create app directory
 WORKDIR /usr/src/app
 # Install app dependencies
