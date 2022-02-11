@@ -1,4 +1,4 @@
-FROM node:76
+FROM node:17
 
 ENV PORT 80
 
