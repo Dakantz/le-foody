@@ -15,7 +15,7 @@ app.get('/', (req, res) => res.send('Le Foody API'));
 
 app.use(bodyParser.urlencoded({ extended: false }))
 
-app.use(cors())
+app.use(cors({ credentials: true, origin: true }))
 // parse application/json
 app.use(bodyParser.json())
 let gclient = new Client();

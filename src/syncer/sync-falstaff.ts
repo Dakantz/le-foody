@@ -3,7 +3,7 @@ import { decode, encode } from "querystring";
 import { MongoClient } from 'mongodb'
 import { Client, PlaceInputType } from "@googlemaps/google-maps-services-js"
 const places_key = "***REMOVED***"
-const uri = "mongodb://root:devpassword@localhost:27017/";
+const uri = "***REMOVED***/";
 const client = new MongoClient(uri);
 let page = 0;
 let gclient = new Client();
