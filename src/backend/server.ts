@@ -78,6 +78,17 @@ app.post("/restaurants", (req, res) => {
                                 ]
                             }
                         }
+                    },
+                    'tripadvisor_rating': {
+                        '$filter': {
+                            'input': '$ratings',
+                            'as': 'rating',
+                            'cond': {
+                                '$eq': [
+                                    '$$rating.rated_by', 'Tripadvisor'
+                                ]
+                            }
+                        }
                     }
                 }
             },
@@ -88,6 +99,9 @@ app.post("/restaurants", (req, res) => {
                     },
                     'google_rating': {
                         '$first': '$google_rating'
+                    },
+                    'tripadvisor_rating': {
+                        '$first': '$tripadvisor_rating'
                     }
                 }
             },
@@ -101,6 +115,11 @@ app.post("/restaurants", (req, res) => {
                     'google_score': {
                         '$divide': [
                             '$google_rating.score', '$google_rating.score_max'
+                        ]
+                    },
+                    'tripadvisor_score': {
+                        '$divide': [
+                            '$tripadvisor_rating.score', '$tripadvisor_rating.score_max'
                         ]
                     }
                 }
@@ -116,6 +135,11 @@ app.post("/restaurants", (req, res) => {
                         '$multiply': [
                             '$google_score', google_weight
                         ]
+                    },
+                    'tripadvisor_weighted': {
+                        '$multiply': [
+                            '$tripadvisor_score', tripadvisor_weight
+                        ]
                     }
                 }
             },
@@ -123,7 +147,7 @@ app.post("/restaurants", (req, res) => {
                 '$addFields': {
                     'complete_sum': {
                         '$add': [
-                            '$falstaff_weighted', '$google_weighted'
+                            '$falstaff_weighted', '$google_weighted', '$tripadvisor_weighted',
                         ]
                     }
                 }
@@ -161,18 +185,54 @@ app.post("/restaurants", (req, res) => {
             }
         ]);
         let final_query = aggregator_query.concat([
+
             {
                 '$sort': {
                     'complete_sum': -1,
-                    "_id": 1
+                    "_id": 1,
                 }
             },
+
             {
                 $skip: skip
             },
             {
                 $limit: limit
-            }]);
+            },
+            {
+                '$unwind': {
+                    'path': '$ratings'
+                }
+            },
+            {
+                '$sort': {
+                    'ratings.rated_by': 1
+                }
+            },
+            {
+                '$group': {
+                    '_id': '$_id',
+                    'name': {
+                        '$first': '$name'
+                    },
+                    'ratings': {
+                        '$push': '$ratings'
+                    },
+                    'homepage': {
+                        '$first': '$homepage'
+                    },
+                    'location': {
+                        '$first': '$location'
+                    },
+                    'price_category': {
+                        '$first': '$price_category'
+                    },
+                    'price_category_level': {
+                        '$first': '$price_category_level'
+                    }
+                }
+            }
+        ]);
         let total_agg = await restaurants.aggregate(count_query)
         let total_doc = await total_agg.next()
         let total = total_doc ? total_doc.total || 0 : 0;

@@ -6,6 +6,7 @@ const places_key = "***REMOVED***"
 const uri = "mongodb://root:devpassword@localhost:27017/";
 const client = new MongoClient(uri);
 let page = 0;
+let gclient = new Client();
 
 
 async function getRestaurants(region?: string, state?: string, page: number = 0) {
@@ -45,7 +46,6 @@ async function getRestaurants(region?: string, state?: string, page: number = 0)
     return data.data
 }
 let regions_str = "Österreich,Deutschland,Italien,Schweiz,Frankreich,Spanien,USA,Großbritannien,Belgien,Kroatien,Niederlande,China,Ungarn,Slowenien,Japan,Dänemark,Tschechische Republik,Portugal,Schweden,Polen,Israel,Türkei,Brasilien,Russische Föderation,Irland,Australien,Südafrika,Norwegen,Südkorea,Griechenland,Finnland,Luxemburg,Marokko,Thailand,Ukraine,Lettland,Taiwan,Äquatorialguinea,Singapur,Vietnam,Kanada,Vereinigten Arabischen Emirate,Estland,Neuseeland,Bulgarien,Slowakei,Rumänien,Kuba,Island,Litauen,Peru,Argentinien,Liechtenstein,Uruguay,Indien,Laos,Mexiko,Barbados,Indonesien,Malaysia,Malta,Bosnien und Herzegowina,Jamaika,Monaco,Libanon,Macao,Antigua und Barbuda,Botsuana,Chile,Malediven,Montenegro,San Marino,Seychellen"
-let gclient = new Client();
 let skip_states = [];//["Wien"];
 let skip_regions = [];//["Österreich", "Deutschland"];
 (async () => {
@@ -53,7 +53,7 @@ let skip_regions = [];//["Österreich", "Deutschland"];
     let db = client.db("le-foody-db")
     try {
 
-        await db.dropCollection("restaurants")
+        // await db.dropCollection("restaurants")
     } catch (error) {
         console.log("Collection was not present")
     }
@@ -84,7 +84,6 @@ let skip_regions = [];//["Österreich", "Deutschland"];
                 console.log(data)
                 let restaurants = []
                 for (let restaurant of data.hits) {
-
                     let place;
                     try {
                         place = await gclient.findPlaceFromText({
@@ -92,11 +91,11 @@ let skip_regions = [];//["Österreich", "Deutschland"];
                                 key: places_key,
                                 input: restaurant.name,
                                 inputtype: PlaceInputType.textQuery,
-                                fields: ["name", "geometry", "price_level", "rating", "user_ratings_total"]
+                                fields: ["name", "geometry", "price_level", "rating", "user_ratings_total", "formatted_address", "photo", "place_id", "business_status", "plus_code", "type"]
                             }
                         })
-                    } catch {
-                        console.warn("Failed to reverse-search for ", restaurant.name)
+                    } catch (e) {
+                        console.warn("Failed to reverse-search for ", restaurant.name, e)
                     }
 
                     let candidate = place && place.data.candidates.length > 0 ? place.data.candidates[0] : null
@@ -107,7 +106,7 @@ let skip_regions = [];//["Österreich", "Deutschland"];
                         console.log(`${restaurant.name} has no coords, maybe reverse-search?`)
                         if (candidate) {
                             let location = candidate.geometry.location
-                            coords = [location.lng, location.lng]
+                            coords = [location.lng, location.lat]
                         } else {
                             console.log(`${restaurant.name} reverse search was not successful!`)
                         }
@@ -125,6 +124,14 @@ let skip_regions = [];//["Österreich", "Deutschland"];
                             "score": candidate.rating,
                             "score_max": 5,
                             "reviewers": candidate.user_ratings_total
+                        })
+                        restaurant.google_data = candidate;
+                    } else {
+                        ratings.push({
+                            "rated_by": "Google",
+                            "score": 0,
+                            "score_max": 5,
+                            "reviewers": 0
                         })
                     }
                     restaurant.ratings = ratings;

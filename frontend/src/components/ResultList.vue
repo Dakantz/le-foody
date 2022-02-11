@@ -9,6 +9,7 @@
                 <th class="text-left">Name</th>
                 <th class="text-left">Falstaff Ratings</th>
                 <th class="text-left">Google Ratings</th>
+                <th class="text-left">Tripadvisor Ratings</th>
                 <th class="text-left"></th>
                 <th class="text-left">Link</th>
               </tr>

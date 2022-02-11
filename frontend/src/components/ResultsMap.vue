@@ -13,7 +13,7 @@
     </v-row>
     <v-row v-if="expanded_map">
       <v-col cols="12" sm="12">
-        <l-map style="height: 600px" :zoom="zoom" :center="center">
+        <l-map ref="map" style="height: 600px">
           <l-tile-layer :url="url" :attribution="attribution"></l-tile-layer>
           <l-marker
             v-for="result of results_filtered"
@@ -45,22 +45,18 @@ export default {
     zoom_to: String,
   },
   watch: {
-    zoom_to() {},
-  },
-  computed: {
-    results_filtered() {
-      let results_filtered = [];
-      for (let result of this.results) {
-        if (result.location) {
-          let result_copy = _.cloneDeep(result);
-          let latlng = [...result.location.coordinates].reverse();
-          result_copy.location.coordinates = latlng;
-          results_filtered.push(result_copy);
+    zoom_to() {
+      if (this.zoom_to) {
+        for (let result of this.results) {
+          if (result._id == this.zoom_to) {
+            let lng = result.location.coordinates[1];
+            let lat = result.location.coordinates[0];
+            this.setView([lng, lat]);
+          }
         }
       }
-      return results_filtered;
     },
-    minmax() {
+    results_filtered() {
       let max_lng = -90;
       let max_lat = -180;
       let min_lng = 90;
@@ -79,39 +75,32 @@ export default {
           min_lat = lat;
         }
       }
-      return { max_lng, min_lng, max_lat, min_lat };
-    },
-    center() {
-      console.log("zooming to", this.zoom_to);
-      if (this.zoom_to) {
-        for (let result of this.results) {
-          if (result._id == this.zoom_to) {
-            let lng = result.location.coordinates[1];
-            let lat = result.location.coordinates[0];
-            return [lng, lat];
-          }
-        }
-      }
-      let { max_lng, min_lng, max_lat, min_lat } = this.minmax;
+
       let avg = [(max_lat + min_lat) / 2, (max_lng + min_lng) / 2];
-      console.log("avg:", avg);
-      return avg;
-    },
-    zoom() {
-      if (this.zoom_to) {
-        for (let result of this.results) {
-          if (result._id == this.zoom_to) {
-            return 14;
-          }
-        }
-      }
-      let { max_lng, min_lng, max_lat, min_lat } = this.minmax;
       let zoom = Math.log2(90 / (max_lat - min_lat));
       if (isNaN(zoom)) {
         zoom = 15;
       }
-      console.log("Desired zoom is", zoom);
-      return zoom;
+      this.setView(avg, zoom);
+    },
+  },
+  methods: {
+    setView(latlng, zoom = 14) {
+      this.$refs.map.mapObject.setView(latlng, zoom);
+    },
+  },
+  computed: {
+    results_filtered() {
+      let results_filtered = [];
+      for (let result of this.results) {
+        if (result.location) {
+          let result_copy = _.cloneDeep(result);
+          let latlng = [...result.location.coordinates].reverse();
+          result_copy.location.coordinates = latlng;
+          results_filtered.push(result_copy);
+        }
+      }
+      return results_filtered;
     },
   },
   data: () => ({
