@@ -3,7 +3,7 @@
     "version": "1.0.0",
     "description": "",
     "scripts": {
-        "build":"tsc"
+        "build": "tsc"
     },
     "repository": {
         "type": "git",
@@ -26,6 +26,7 @@
         "lodash": "^4.17.21",
         "mongodb": "^4.3.1",
         "node-fetch": "^3.2.0",
+        "npx": "^10.2.2",
         "puppeteer": "^13.3.1",
         "querystring": "^0.2.1",
         "selenium": "^2.20.0"
