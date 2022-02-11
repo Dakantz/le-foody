@@ -1,10 +1,11 @@
 import bodyParser from 'body-parser';
 import express from 'express';
+import cors from "cors"
 // rest of the code remains same
 const app = express();
 const PORT = process.env.PORT || 8123;
 import { Document, MongoClient } from 'mongodb'
-import { Client, PlaceInputType } from "@googlemaps/google-maps-services-js"
+import { Client, FindPlaceFromTextResponse, PlaceInputType } from "@googlemaps/google-maps-services-js"
 const places_key = process.env.PLACES_API_KEY || "AIzaSyAhR0tAWZocf--xAaiLfS21Rdz9Ap961Sc"
 const uri = process.env.MONGODB_CONN_STRING || "mongodb://root:devpassword@localhost:27017/";
 const mongo = new MongoClient(uri);
@@ -14,10 +15,39 @@ app.get('/', (req, res) => res.send('Le Foody API'));
 
 app.use(bodyParser.urlencoded({ extended: false }))
 
+app.use(cors())
 // parse application/json
 app.use(bodyParser.json())
+let gclient = new Client();
+app.get("/location-search", (req, res) => {
+    (async () => {
+        let places: FindPlaceFromTextResponse;
+        if (!req.query.query) {
+            throw Error("Please add a valid query!")
+        }
+        let query = (req.query.query + "") || "";
+        try {
+            places = await gclient.findPlaceFromText({
+                params: {
+                    key: places_key,
+                    input: query,
+                    inputtype: PlaceInputType.textQuery,
+                    fields: ["name", "geometry"]
+                }
+            })
+            res.json({ candidates: places.data.candidates })
+        } catch {
+            console.warn("Failed to reverse-search for ", query)
+            throw Error("Please add a valid query!")
 
-app.post("/restaurant", (req, res) => {
+        }
+    })().catch(e => {
+        console.error(e)
+        res.status(400)
+        res.json({ message: e + "" })
+    })
+});
+app.post("/restaurants", (req, res) => {
     (async () => {
         let falstaff_weight = req.body.falstaff_weight || 0.5
         let google_weight = req.body.google_weight || 0.5
@@ -100,6 +130,15 @@ app.post("/restaurant", (req, res) => {
             }
         ];
         if (req.body.location) {
+            if (!req.body.location.distance || req.body.location.distance == 0) {
+                return {
+                    total: 0,
+                    skip,
+                    limit,
+                    results: [],
+                    message: "Query successful!"
+                };
+            }
             let location_query = req.body.location;
             let coords = [location_query.lng, location_query.lat]
             let geo_near: Document = {
@@ -124,7 +163,8 @@ app.post("/restaurant", (req, res) => {
         let final_query = aggregator_query.concat([
             {
                 '$sort': {
-                    'complete_sum': -1
+                    'complete_sum': -1,
+                    "_id": 1
                 }
             },
             {
@@ -140,18 +180,20 @@ app.post("/restaurant", (req, res) => {
         let results_agg = await restaurants.aggregate(final_query);
         let results = await results_agg.toArray();
 
-        res.json({
+        return {
             total,
             skip,
             limit,
             results,
             message: "Query successful!"
-        })
+        };
 
-    })().catch(e => {
+    })().then((d) => {
+        res.json(d)
+    }).catch(e => {
         console.error(e)
         res.status(400)
-        res.json({ error: e + "" })
+        res.json({ message: e + "" })
     })
 });
 
