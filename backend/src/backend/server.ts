@@ -266,6 +266,7 @@ app.post("/restaurants", (req, res) => {
     });
 
 })().catch(e => {
+    console.error(e)
     console.error("Server could not start, exiting!")
     process.exit(-1)
 })
