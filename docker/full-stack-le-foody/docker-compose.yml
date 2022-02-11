@@ -5,7 +5,7 @@ services:
       context: ../../backend
     environment:
       PORT: 80
-      MONGODB_CONN_STRING: mongodb://root:devpassword@localhost:27017/
+      MONGODB_CONN_STRING: mongodb://root:benediktfooder@localhost:27017/
     labels:
       # Traefik configuration, Hostname needs to be changed
       - traefik.http.routers.le-foody-api-http.rule=Host(`api.le-foody.dakantz.at`)
@@ -34,18 +34,29 @@ services:
       - "api"
     labels:
       # Traefik configuration, Hostname needs to be changed
-      - traefik.http.routers.le-foody-fe-http.rule=Host(`db.le-foody.dakantz.at`)
-      - traefik.http.routers.le-foody-fe-http.entrypoints=27017
+      - traefik.http.routers.le-foody-fe-http.rule=Host(`le-foody.dakantz.at`)
+      - traefik.http.routers.le-foody-fe-http.entrypoints=http
+      - traefik.http.routers.le-foody-fe-http.middlewares=redirect
+      - traefik.http.routers.le-foody-fe-https.rule=Host(`le-foody.dakantz.at`)
+      - traefik.http.routers.le-foody-fe-https.entrypoints=https
+      - traefik.http.routers.le-foody-fe-https.tls=true
+      - traefik.http.routers.le-foody-fe-https.tls.certresolver=letsencrypt
+      - traefik.http.services.le-foody-fe.loadbalancer.server.port=80
+      - traefik.http.middlewares.redirect.redirectscheme.scheme=https
   mongo:
     image: mongo
     restart: always
+    labels:
+      # Traefik configuration, Hostname needs to be changed
+      - traefik.http.routers.le-foody-fe-http.rule=Host(`db.le-foody.dakantz.at`)
+      - traefik.http.routers.le-foody-fe-http.entrypoints=27017
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: deploymend_pw
+      MONGO_INITDB_ROOT_PASSWORD: benediktfooder
     ports:
       - 27017:27017
     volumes:
-      - mongodataa:/data/db
+      - mongodata:/data/db
 volumes:
   mongodata: {}
 networks:
