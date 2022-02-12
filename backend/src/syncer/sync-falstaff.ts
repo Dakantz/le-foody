@@ -46,8 +46,8 @@ async function getRestaurants(region?: string, state?: string, page: number = 0)
     return data.data
 }
 let regions_str = "Österreich,Deutschland,Italien,Schweiz,Frankreich,Spanien,USA,Großbritannien,Belgien,Kroatien,Niederlande,China,Ungarn,Slowenien,Japan,Dänemark,Tschechische Republik,Portugal,Schweden,Polen,Israel,Türkei,Brasilien,Russische Föderation,Irland,Australien,Südafrika,Norwegen,Südkorea,Griechenland,Finnland,Luxemburg,Marokko,Thailand,Ukraine,Lettland,Taiwan,Äquatorialguinea,Singapur,Vietnam,Kanada,Vereinigten Arabischen Emirate,Estland,Neuseeland,Bulgarien,Slowakei,Rumänien,Kuba,Island,Litauen,Peru,Argentinien,Liechtenstein,Uruguay,Indien,Laos,Mexiko,Barbados,Indonesien,Malaysia,Malta,Bosnien und Herzegowina,Jamaika,Monaco,Libanon,Macao,Antigua und Barbuda,Botsuana,Chile,Malediven,Montenegro,San Marino,Seychellen"
-let skip_states = [];//["Wien"];
-let skip_regions = [];//["Österreich", "Deutschland"];
+let skip_states = ["Wien"];//["Wien"];
+let skip_regions = ["Österreich"];//["Österreich", "Deutschland"];
 (async () => {
     await client.connect();
     let db = client.db("le-foody-db")
@@ -117,7 +117,12 @@ let skip_regions = [];//["Österreich", "Deutschland"];
                         "score": restaurant.rating ? restaurant.rating.points_total : 0,
                         "score_max": 100,
                         "reviewers": 1
-                    },]
+                    }, {
+                        rated_by: "Tripadvisor",
+                        score: 0,
+                        score_max: 5,
+                        reviewers: 0
+                    }]
                     if (candidate) {
                         ratings.push({
                             "rated_by": "Google",

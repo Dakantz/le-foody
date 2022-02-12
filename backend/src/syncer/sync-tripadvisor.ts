@@ -3,9 +3,9 @@ import { decode, encode } from "querystring";
 import { MongoClient } from 'mongodb'
 import _ from "lodash"
 import puppeteer, { ElementHandle, Page } from 'puppeteer'
-import { Client, PlaceInputType } from "@googlemaps/google-maps-services-js"
+import { Client, Language, LatLngLiteral, PlaceInputType } from "@googlemaps/google-maps-services-js"
 const places_key = "***REMOVED***"
-const uri = "mongodb://root:devpassword@localhost:27017/";
+const uri = "***REMOVED***/";
 const client = new MongoClient(uri);
 let gclient = new Client();
 
@@ -16,7 +16,10 @@ let page = 0;
 let db = client.db("le-foody-db")
 let collection = db.collection("restaurants")
 
-async function prepareData(existing: any, restaurant: any) {
+async function prepareData(existing: any, restaurant: any, biased_coords: LatLngLiteral) {
+    if (Object.keys(existing).length == 0) {
+        existing = _.cloneDeep(restaurant);
+    }
     let candidate = existing.google_data;
     let coords = null;
     if (!candidate) {
@@ -28,7 +31,9 @@ async function prepareData(existing: any, restaurant: any) {
                     key: places_key,
                     input: restaurant.name,
                     inputtype: PlaceInputType.textQuery,
-                    fields: ["name", "geometry", "price_level", "rating", "user_ratings_total", "formatted_address", "photo", "place_id", "business_status", "plus_code", "type"]
+                    fields: ["name", "geometry", "price_level", "rating", "user_ratings_total", "formatted_address", "photo", "place_id", "business_status", "plus_code", "type"],
+                    language: Language.en,
+                    locationbias: `point:${biased_coords.lat},${biased_coords.lng}`
                 }
             })
         } catch (e) {
@@ -43,13 +48,11 @@ async function prepareData(existing: any, restaurant: any) {
         candidate.rating = 0;
         candidate.user_ratings_total = 0;
     }
-    if (candidate) {
+    if (candidate.geometry) {
         let location = candidate.geometry.location
         coords = [location.lng, location.lat]
     }
-    if (Object.keys(existing).length == 0) {
-        existing = _.cloneDeep(restaurant);
-    }
+
     if (!existing.location && coords) {
         existing.location = {
             type: "Point",
@@ -96,7 +99,7 @@ async function prepareData(existing: any, restaurant: any) {
     }
     return existing
 }
-async function handleTripadvisor(restaurant: any) {
+async function handleTripadvisor(restaurant: any, biased_coords: LatLngLiteral) {
     let existing_restaurant = null
     try {
         existing_restaurant = await collection.findOne({
@@ -108,7 +111,7 @@ async function handleTripadvisor(restaurant: any) {
     }
 
     if (existing_restaurant) {
-        let modified_data = await prepareData(existing_restaurant, restaurant)
+        let modified_data = await prepareData(existing_restaurant, restaurant, biased_coords)
         await collection.replaceOne({
             "_id": existing_restaurant._id
 
@@ -116,7 +119,7 @@ async function handleTripadvisor(restaurant: any) {
         console.log(`update  ${existing_restaurant._id}`)
     } else {
 
-        let modified_data = await prepareData({}, restaurant)
+        let modified_data = await prepareData({}, restaurant, biased_coords)
         let result = await collection.insertOne(modified_data)
         console.log(`inserted  ${result.insertedId}`)
     }
@@ -130,30 +133,13 @@ async function acceptCookies(page: Page) {
     await page.click("#onetrust-accept-btn-handler")
     await page.waitForTimeout(1000)
 }
-const do_tripadvisor_prepare = false;
-(async () => {
-    await client.connect();
-    try {
+const do_tripadvisor_prepare = true;
+let last_restaurant = null
+let start_region = 13;
+async function scraper(skip_until, start_state = 0) {
+    let skipping = !!skip_until;
 
-        // await db.dropCollection("restaurants")
-    } catch (error) {
-        console.log("Collection was not present")
-    }
 
-    if (do_tripadvisor_prepare) {
-
-        let result = await collection.updateMany({ ratings: { $not: { $elemMatch: { rated_by: "Tripadvisor" } } } }, {
-            $push: {
-                ratings: {
-                    rated_by: "Tripadvisor",
-                    score: 0,
-                    score_max: 5,
-                    reviewers: 0
-                } as never
-            }
-        })
-        console.log(`Updated ${result.modifiedCount} entries!`)
-    }
 
     browser = await puppeteer.launch({
         headless: false
@@ -165,7 +151,7 @@ const do_tripadvisor_prepare = false;
         await page.goto(link);
         await acceptCookies(page);
         let subregion_links = await page.$$(".geo_entry")
-        for (let index = 0; index < subregion_links.length; index++) {
+        for (let index = start_state; index < subregion_links.length; index++) {
 
             await page.waitForSelector(".geo_entry")
             subregion_links = await page.$$(".geo_entry")
@@ -175,7 +161,7 @@ const do_tripadvisor_prepare = false;
 
             await page.waitForSelector(".ui_checkbox.bwWEH.w")
 
-            if (index == 0) {
+            if (index == start_state) {
                 await acceptCookies(page);
             }
             console.log("Should be in subregion...")
@@ -187,6 +173,7 @@ const do_tripadvisor_prepare = false;
 
 
             console.log("We are ready to scrape...")
+            let biased_coords: LatLngLiteral = null;
             while (has_more_pages) {
                 let batch_response = await page.waitForResponse(async (res) => {
 
@@ -203,7 +190,31 @@ const do_tripadvisor_prepare = false;
                 let rests_lvl0 = batch_data[Object.keys(batch_data)[0]]
                 let restaurants = rests_lvl0[Object.keys(rests_lvl0)[0]].body.restaurants
                 for (const restaurant of restaurants) {
-                    await handleTripadvisor(restaurant)
+                    if (skipping) {
+                        console.log("Skipping", restaurant.name)
+                        if (restaurant.name == skip_until) {
+                            skipping = false;
+                        }
+                    } else {
+                        if (!biased_coords && restaurant.parentGeoName) {
+                            try {
+                                let places = await gclient.findPlaceFromText({
+                                    params: {
+                                        key: places_key,
+                                        input: restaurant.parentGeoName,
+                                        inputtype: PlaceInputType.textQuery,
+                                        fields: ["name", "geometry"],
+                                        language: Language.en
+                                    }
+                                })
+                                biased_coords = places.data.candidates.length > 0 ? places.data.candidates[0].geometry.location : null
+                            } catch {
+                                console.warn("Failed to find bias for for ", restaurant.parentGeo)
+                            }
+                        }
+                        await handleTripadvisor(restaurant, biased_coords)
+                        last_restaurant = restaurant.name
+                    }
                 }
 
                 console.log("Inserted all entries of current page!")
@@ -223,7 +234,42 @@ const do_tripadvisor_prepare = false;
 
 
     }
+}
+(async () => {
+
+    await client.connect();
+    try {
+
+        // await db.dropCollection("restaurants")
+    } catch (error) {
+        console.log("Collection was not present")
+    }
+
+    if (do_tripadvisor_prepare) {
+        let empty_names = await collection.deleteMany({
+            name: null
+        })
+        console.log(`Deleted ${empty_names.deletedCount} empty entries!`)
+        let result = await collection.updateMany({ ratings: { $not: { $elemMatch: { rated_by: "Tripadvisor" } } } }, {
+            $push: {
+                ratings: {
+                    rated_by: "Tripadvisor",
+                    score: 0,
+                    score_max: 5,
+                    reviewers: 0
+                } as never
+            }
+        })
+        console.log(`Updated ${result.modifiedCount} entries!`)
+    }
+    while (true) {
+        try {
+            await scraper(last_restaurant, start_region)
+        } catch (error) {
+            console.warn("Failed to scrape, will restart @", last_restaurant, "error:", error)
+            browser.close();
+        }
+    }
 })().catch(e => {
-    console.error(e)
-    // browser.close();
+    console.error("general fault, needs restarting", e)
 })
