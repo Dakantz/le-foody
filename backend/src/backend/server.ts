@@ -6,7 +6,7 @@ const app = express();
 const PORT = process.env.PORT || 8123;
 import { Document, MongoClient } from 'mongodb'
 import { Client, FindPlaceFromTextResponse, PlaceInputType } from "@googlemaps/google-maps-services-js"
-const places_key = process.env.PLACES_API_KEY || "***REMOVED***"
+const places_key = process.env.PLACES_API_KEY || "YOUR_GOOGLE_PLACES_API_KEY"
 const uri = process.env.MONGODB_CONN_STRING || "mongodb://root:devpassword@localhost:27017/";
 const mongo = new MongoClient(uri);
 const restaurants = mongo.db('le-foody-db').collection('restaurants');
