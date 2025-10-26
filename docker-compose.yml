@@ -1,0 +1,37 @@
+version: "3.4"
+services:
+  api:
+    restart: unless-stopped
+    build:
+      context: ./backend
+    environment:
+      PORT: 80
+      MONGODB_CONN_STRING: mongodb://root:benediktfooder@mongodb:27017/
+      PLACES_API_KEY: AIzaSyAr8tNyS-uRHrJf3SSY5mVtYMbD2BZArvw
+    labels:
+      # Traefik configuration, Hostname needs to be changed
+      - traefik.http.routers.le-foody-api-http.rule=Host(`api-le-foody.hafen.dakantz.at`)
+      - traefik.http.routers.le-foody-api-http.entrypoints=http
+      - traefik.http.services.le-foody-api.loadbalancer.server.port=80
+    networks:
+      - web
+      - internal
+  frontend:
+    restart: unless-stopped
+    build:
+      context: ./frontend/
+    networks:
+      - web
+      - internal
+    depends_on:
+      - "api"
+    labels:
+      # Traefik configuration, Hostname needs to be changed
+      - traefik.http.routers.le-foody-fe-http.rule=Host(`le-foody.hafen.dakantz.at`)
+      - traefik.http.routers.le-foody-fe-http.entrypoints=http
+      - traefik.http.services.le-foody-fe.loadbalancer.server.port=80
+networks:
+  web:
+    external: true
+  internal:
+    external: false
